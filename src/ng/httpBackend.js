@@ -51,7 +51,7 @@ function createHttpBackend($browser, XHR, $browserDefer, callbacks, rawDocument,
         }
         delete callbacks[callbackId];
       });
-    } else {
+    } else if ('withCredentials' in new XMLHttpRequest()) {
       var xhr = new XHR();
       xhr.open(method, url, true);
       forEach(headers, function(value, key) {
@@ -84,6 +84,33 @@ function createHttpBackend($browser, XHR, $browserDefer, callbacks, rawDocument,
         $browserDefer(function() {
           status = -1;
           xhr.abort();
+        }, timeout);
+      }
+    } else if (typeof XDomainRequest !== "undefined") {
+      // IE8/9 CORS http://msdn.microsoft.com/en-us/library/ie/cc288060(v=vs.85).aspx
+      var xdr = new XDomainRequest();
+      xdr.open(method, url);
+
+      if (responseType) {
+        xdr.responseType = responseType;
+      }
+
+      xdr.onload = function() {
+        completeRequest(
+              callback, 200, xdr.responseText, null);
+      };
+      xdr.ontimeout = function() {};
+      xdr.onprogress = function() {};
+      xdr.onerror = function() {
+        completeRequest(
+              callback, 404, xdr.responseText, null);
+      };
+
+      xdr.send(post || '');
+
+      if (timeout > 0) {
+        $browserDefer(function() {
+          xdr.abort();
         }, timeout);
       }
     }
